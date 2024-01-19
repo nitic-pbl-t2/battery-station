@@ -21,3 +21,6 @@ except requests.exceptions.RequestException as e:
     print("APIへのリクエスト中にエラーが発生しました:", e)
 except ValueError as e:
     print("JSONデータの解析中にエラーが発生しました:", e)
+
+
+    
