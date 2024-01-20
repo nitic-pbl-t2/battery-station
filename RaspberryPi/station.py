@@ -8,7 +8,7 @@ ser.flush()
 def receive_from_arduino():
     if ser.in_waiting > 0:
         line = ser.readline().decode('utf-8').rstrip()
-        print("Received from Arduino:", line)
+        print("Receivegmaild from Arduino:", line)
 
         # 受信したJSONデータをパース
         try:
