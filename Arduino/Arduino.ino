@@ -1,7 +1,9 @@
 // serial portを MEGAにするが必要あります  macから編集してみましたどう？変更が更新されてる？
 // 192.168.10.124 2400:4051:c101:6700:c3ad:c13d:a4bf:10b5 
 #include <Servo.h>
+#include <LiquidCrystal.h>
 
+LiquidCrystal lcd(8,9,10,11,12,13);
 
 // 使用するピンの定義
 const int VOL_PIN = A0; // ポートの電流を流すピン
@@ -18,7 +20,6 @@ const int LED_PIN_RED = 7; // Reserved
 // サーボを動かすときに使う変数
 Servo servo; 
 
-
 void setup() {
     pinMode(SWITCH_PIN, INPUT);
     pinMode(SWITCH_PIN2,INPUT);
@@ -26,61 +27,82 @@ void setup() {
     pinMode(LED_PIN_YELLOW, OUTPUT);
     pinMode(LED_PIN_RED, OUTPUT);
     servo.attach(SV_PIN, 500, 2400);
+    lcd.begin(16,2);
     Serial.begin(9600);
+    Serial.setTimeout(5000);
 }
 
-String isOpen="0"; // 蓋を開けるかの処理
+int isOpen=0; // 蓋を開けるかの処理
 bool isCharging= false;  // バッテリーが充電されているかのフラグ
 bool isConnected=false;
 bool hasBatterySet = false; 
 float volt=0.0; // 計測された電圧が入る
 const int  sampleTimes=10; // 計測回数
 const int  open_degree = 180;
-const int close_degree = 75;
+const int close_degree = 60;
 
 void loop() {
   // data from rasberry pi
    if (Serial.available() > 0) {
     String data = Serial.readStringUntil('\n');
-    Serial.println(data);
-    isOpen = data;
+
+    if(data.indexOf("passcode")){
+      lcd.setCursor(0,1);
+      lcd.print(data);
+    }else if (data.indexOf("isOpen")){
+      if(data.indexOf("1")){
+        isOpen = 1;
+      }else{
+        isOpen = 0;
+        }
+      // 蓋の動作
+      if(isOpen == 1){
+        servo.write(open_degree);  // サーボモーターを0度の位置まで動かす -> 開いてる状態
+      }else if(hasBatterySet == true){
+        servo.write(close_degree);  // サーボモーターを90度の位置まで動かす -> 閉じてる状態
+      }
+    }
     if (hasBatterySet == true){
       hasBatterySet = false;
       }
   }
 
     volt = analogRead(VOL_PIN);
-    volt = 2 * volt * 5.0 / 1023.0;
-    Serial.print("volt : ");
-    Serial.println(volt);
+    volt = volt * 5.0 / 1023.0;
+    lcd.setCursor(0,0);
+    lcd.print("volt:"  + String(volt));
         
-    // 蓋の動作
-    if(isOpen == "1"){
-      servo.write(open_degree);  // サーボモーターを0度の位置まで動かす -> 開いてる状態
-    }else if(hasBatterySet == true){
-      servo.write(close_degree);  // サーボモーターを90度の位置まで動かす -> 閉じてる状態
-    }
 
 
     // バッテリーに電流が流れているかの判定
     // バッテリーの状態を表現する変数 -> strcmpで初期化できてなかったら怖いので、ローカルスコープで定義する
     char state[10];
-    int floatCount=0; // 浮遊している判定の回数
-    int chargeCount=0;
+
+  
+    if(volt >= 0.3){ 
+      isCharging=true;
+    }else{
+      isCharging =false;
+    }
+    
+
+    
+//    int floatCount=0; // /浮遊している判定の回数
+//    int chargeCount=0;/
 
     // 浮遊しているしている多数決をとる
-    for(int i=0;i< sampleTimes ;i++){
-        // 電圧の計測
-      volt = analogRead(VOL_PIN);
-      volt = 2 * volt * 5.0 / 1023.0;
-
-      if(volt <= 0.03){  // 0.03v 以下だったら浮遊していると見做す（実験の結果）
-        floatCount++;
-      }else{
-        chargeCount++;
-      }
-      delay(1000); // 0.1秒後にまた計測
-    }
+//    for(int i=0;i< sampleTimes ;i++){
+//        // 電圧の計測
+//      volt = analogRead(VOL_PIN);
+//      volt = 2 * volt * 5.0 / 1023.0;
+//
+//      if(volt <= 0.03){  // 0.03v 以下だったら浮遊していると見做す（実験の結果）
+//        floatCount++;
+//      }else{
+//        chargeCount++;
+//      }
+//      delay(1000); // 0.1秒後にまた計測
+//    }
 
     // 多数決の結果の表示
 //    Serial.println("Is battery charging now?");
@@ -89,11 +111,11 @@ void loop() {
 //    Serial.print("yes: ");
 //    Serial.println(chargeCount);
     
-    if(chargeCount > 0.8 * sampleTimes){ // 充電している判定が、計測回数の9割を超えたら
-      isCharging=true;
-    }else{
-      isCharging =false;
-    }
+//    if(chargeCount > 0.8 * sampleTimes){ // 充電している判定が、計測回数の9割を超えたら
+//      isCharging=true;
+//    }else{
+//      isCharging =false;
+//    }
 
     // 計測したデータからバッテリーの状態を求める
     isConnected = !digitalRead(SWITCH_PIN);
@@ -129,4 +151,5 @@ void loop() {
       delay(2000); 
       hasBatterySet = true;
       }
+    delay(3000);
 }

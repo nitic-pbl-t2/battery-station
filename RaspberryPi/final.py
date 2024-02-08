@@ -8,16 +8,16 @@ import json
 ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
 
 if ser is None:
-    print("serial port cannot be read")
+    print("シリアルポートを開けませんでした。おそらく、シリアルポートを他で利用していて、同時に利用できないケース。")
 
 # GUIの設定
-root = tk.Tk()
-root.title("passcode")
+# root = tk.Tk()
+# root.title("passcode")
 
 # 5けたの数値を表示するラベル
-display_var = tk.StringVar()
-display_label = tk.Label(root, textvariable=display_var, font=("Arial", 200), width=40)
-display_label.pack()
+# display_var = tk.StringVar()
+# display_label = tk.Label(root, textvariable=display_var, font=("Arial", 200), width=40)
+# display_label.pack()
 
 
 # APIのURL
@@ -26,12 +26,12 @@ url_passcode = "https://mobazy.vercel.app/api/station/passcode"
 url_update = "https://mobazy.vercel.app/api/station/update"
 
 
-def update_display(value):
-    display_var.set(value)
-    root.update()
+# def update_display(value):
+#     display_var.set(value)
+# root.update()
 
 
-def get_passcode():
+def send_passcode():
     try:
         response = requests.get(url_passcode)
         response.raise_for_status()
@@ -39,7 +39,9 @@ def get_passcode():
         passcode = data.get("passcode")
         if passcode is not None:
             print("passcode: ", passcode)
-            update_display(passcode)
+            # arduinoにパスコードを送信
+            data_to_send = str("passcode-" + str(passcode) + "\n")
+            ser.write(data_to_send.encode("utf-8"))
         else:
             print("passcodeが見つかりませんでした。")
     except requests.exceptions.RequestException as e:
@@ -56,7 +58,7 @@ def send_isopen():
         isOpen = data.get("isOpen")
         if isOpen is not None:
             print("蓋をあける？:", isOpen)
-            data_to_send = "1" if isOpen else "0"
+            data_to_send = "isOpen-1\n" if isOpen else "isOpen-0\n"
             ser.write(data_to_send.encode("utf-8"))
         else:
             print("isOpenが見つかりませんでした。")
@@ -67,13 +69,13 @@ def send_isopen():
 
 
 # 初期値はゼロ
-get_passcode()
-root.update()
+send_passcode()
+# root.update()
 
 # setting passcode reset interval
 passcode_update_interval = 3000
 isopen_update_interval = 10
-delay_time = 1
+delay_time = 3
 
 passcode_update_count = passcode_update_interval
 isopen_update_count = isopen_update_interval
@@ -86,6 +88,7 @@ while True:
     if ser.in_waiting > 0:
         line = ser.readline().decode("utf-8").rstrip()
         status = line
+        print("status: " + status)
         available_batteries = 1 if status == "Available" else 0
         print("利用可能なバッテリー数: " + str(available_batteries))
         if previous_availableBatteries != available_batteries:
@@ -99,7 +102,7 @@ while True:
             print("Response Content:", response.text)
 
     if count % passcode_update_count == 0:
-        get_passcode()
+        send_passcode()
 
     if count % isopen_update_count == 0:
         send_isopen()
